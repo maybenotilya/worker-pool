@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // TODO: add panic recover for handler purposes
 type WorkerPool struct {
 	jobs      chan string
 	handler   func(string) error // Handler MUST NOT panic!!!
+	timeout   time.Duration      // Delay to try to add new task in full queue
 	stopChans map[int]chan bool
 	mutex     sync.Mutex
 	nextID    int
@@ -19,10 +21,11 @@ type WorkerPool struct {
 	isStopped atomic.Bool
 }
 
-func New(bufferSize int, handler func(string) error) *WorkerPool {
+func New(bufferSize int, timeout time.Duration, handler func(string) error) *WorkerPool {
 	return &WorkerPool{
 		jobs:      make(chan string, bufferSize),
 		handler:   handler,
+		timeout:   timeout,
 		stopChans: make(map[int]chan bool),
 	}
 }
@@ -89,15 +92,19 @@ func (pool *WorkerPool) RemoveWorker(id int) error {
 	return nil
 }
 
-// TODO: add check if jobs channel is full
 func (pool *WorkerPool) AddJob(job string) error {
 	if pool.isStopped.Load() {
 		return errors.New("failed to add job: worker pool is stopped")
 	}
 
 	pool.jobs_wg.Add(1)
-	pool.jobs <- job
-	return nil
+	select {
+	case pool.jobs <- job:
+		return nil
+	case <-time.After(pool.timeout):
+		pool.jobs_wg.Done()
+		return errors.New("failed to add job: job queue is full")
+	}
 }
 
 func (pool *WorkerPool) Stop() {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 	"workerpool/workerpool"
 )
 
@@ -12,7 +13,7 @@ func main() {
 		fmt.Printf("Hello from job number %s!\n", name)
 		return nil
 	}
-	pool := workerpool.New(10, hello_func)
+	pool := workerpool.New(10, 2*time.Second, hello_func)
 
 	for range 3 {
 		_, err := pool.AddWorker()

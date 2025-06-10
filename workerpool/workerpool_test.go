@@ -5,10 +5,11 @@ import (
 	"math/rand"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestAddRemove(t *testing.T) {
-	pool := New(10, func(s string) error { return nil })
+	pool := New(10, 5*time.Second, func(s string) error { return nil })
 	id1, err1 := pool.AddWorker()
 	id2, err2 := pool.AddWorker()
 
@@ -34,7 +35,7 @@ func TestJobs(t *testing.T) {
 	num_workers := 10
 	num_runs := 100
 
-	pool := New(5, func(s string) error {
+	pool := New(5, 5*time.Second, func(s string) error {
 		counter.Add(1)
 		return nil
 	})
@@ -68,7 +69,7 @@ func TestErrorsHandle(t *testing.T) {
 	num_errors := 50
 	num_runs := num_errors * 2
 
-	pool := New(10, func(s string) error {
+	pool := New(10, 5*time.Second, func(s string) error {
 		if s == "error" {
 			counter.Add(1)
 			return errors.New("error")
@@ -107,7 +108,7 @@ func TestErrorsHandle(t *testing.T) {
 }
 
 func TestRemoveNonExistential(t *testing.T) {
-	pool := New(10, func(s string) error { return nil })
+	pool := New(10, 5*time.Second, func(s string) error { return nil })
 	_, err := pool.AddWorker()
 	if err != nil {
 		pool.Stop()
@@ -122,7 +123,7 @@ func TestRemoveNonExistential(t *testing.T) {
 }
 
 func TestRemoveAfterStop(t *testing.T) {
-	pool := New(10, func(s string) error { return nil })
+	pool := New(10, 5*time.Second, func(s string) error { return nil })
 	id, err := pool.AddWorker()
 	if err != nil {
 		pool.Stop()
@@ -138,7 +139,7 @@ func TestRemoveAfterStop(t *testing.T) {
 }
 
 func TestAddAfterStop(t *testing.T) {
-	pool := New(10, func(s string) error { return nil })
+	pool := New(10, 5*time.Second, func(s string) error { return nil })
 	pool.Stop()
 
 	_, err := pool.AddWorker()
@@ -148,7 +149,7 @@ func TestAddAfterStop(t *testing.T) {
 }
 
 func TestJobAfterStop(t *testing.T) {
-	pool := New(10, func(s string) error { return nil })
+	pool := New(10, 5*time.Second, func(s string) error { return nil })
 	pool.Stop()
 
 	err := pool.AddJob("")
@@ -159,7 +160,7 @@ func TestJobAfterStop(t *testing.T) {
 }
 
 func TestAddJobWithoutWorkers(t *testing.T) {
-	pool := New(10, func(s string) error {
+	pool := New(10, 5*time.Second, func(s string) error {
 		t.Error("Handler shouldn't be called without workers")
 		return nil
 	})
@@ -175,8 +176,31 @@ func TestAddJobWithoutWorkers(t *testing.T) {
 	pool.Stop()
 }
 
+func TestAddJobFullQueue(t *testing.T) {
+	bufferSize := 5
+	pool := New(bufferSize, 5*time.Second, func(s string) error {
+		t.Error("Handler shouldn't be called without workers")
+		return nil
+	})
+
+	for range bufferSize {
+		err := pool.AddJob("Job")
+		if err != nil {
+			pool.Stop()
+			t.Fatal(err)
+		}
+	}
+
+	err := pool.AddJob("Job")
+	if err == nil || err.Error() != "failed to add job: job queue is full" {
+		t.Fatalf("Expected 'job queue is full' error, got: %v", err)
+	}
+
+	pool.Stop()
+}
+
 func TestMultipleStop(t *testing.T) {
-	pool := New(10, func(s string) error { return nil })
+	pool := New(10, 5*time.Second, func(s string) error { return nil })
 
 	for range 7 {
 		pool.Stop()
@@ -191,7 +215,7 @@ func TestRandomOperations(t *testing.T) {
 
 	available_ids := []int{}
 
-	pool := New(3, func(s string) error { return nil })
+	pool := New(3, 5*time.Second, func(s string) error { return nil })
 
 	for range num_workers {
 		id, err := pool.AddWorker()

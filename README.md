@@ -12,4 +12,4 @@ Tests can be found in `workerpool/workerpool_test.go`.
 
 ## Knows issues
 
-1. Currently adding new job doesn't check if jobs queue is full and may result in gorutine blocking.
+1. Handlers MUST NOT panic. Support of panic will be added later.
