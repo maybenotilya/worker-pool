@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 )
 
-// At this stage there is no thread-safety guarantee
 // TODO: add panic recover for handler purposes
 type WorkerPool struct {
 	jobs      chan string
