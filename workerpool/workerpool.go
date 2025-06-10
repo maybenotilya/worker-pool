@@ -126,6 +126,7 @@ func (pool *WorkerPool) Stop() {
 	pool.wg.Wait()
 }
 
+// Waits till all jobs are done and stops after
 func (pool *WorkerPool) StopWait() {
 	pool.mutex.Lock()
 
