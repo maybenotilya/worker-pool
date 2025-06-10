@@ -31,8 +31,8 @@ func TestAddRemove(t *testing.T) {
 
 func TestJobs(t *testing.T) {
 	var counter atomic.Int32
-	var num_workers = 10
-	var num_runs int = 100
+	num_workers := 10
+	num_runs := 100
 
 	pool := New(5, func(s string) error {
 		counter.Add(1)
@@ -40,11 +40,19 @@ func TestJobs(t *testing.T) {
 	})
 
 	for range num_workers {
-		pool.AddWorker()
+		_, err := pool.AddWorker()
+		if err != nil {
+			pool.Stop()
+			t.Fatal(err)
+		}
 	}
 
 	for range num_runs {
-		pool.AddJob("")
+		err := pool.AddJob("Job")
+		if err != nil {
+			pool.Stop()
+			t.Fatal(err)
+		}
 	}
 
 	pool.StopWait()
@@ -56,9 +64,9 @@ func TestJobs(t *testing.T) {
 
 func TestErrorsHandle(t *testing.T) {
 	var counter atomic.Int32
-	var num_workers int = 100
-	var num_errors int = 50
-	var num_runs int = num_errors * 2
+	num_workers := 10
+	num_errors := 50
+	num_runs := num_errors * 2
 
 	pool := New(10, func(s string) error {
 		if s == "error" {
@@ -69,18 +77,28 @@ func TestErrorsHandle(t *testing.T) {
 	})
 
 	for range num_workers {
-		pool.AddWorker()
-	}
-
-	for i := range num_runs {
-		if i%2 == 0 {
-			pool.AddJob("error")
-		} else {
-			pool.AddJob("not error")
+		_, err := pool.AddWorker()
+		if err != nil {
+			pool.Stop()
+			t.Fatal(err)
 		}
 	}
 
-	pool.Stop()
+	for i := range num_runs {
+		var err error
+		if i%2 == 0 {
+			err = pool.AddJob("error")
+		} else {
+			err = pool.AddJob("not error")
+		}
+
+		if err != nil {
+			pool.Stop()
+			t.Fatal(err)
+		}
+	}
+
+	pool.StopWait()
 
 	if counter.Load() != int32(num_errors) {
 		t.Fatalf("Processed %d errors, expected %d", counter.Load(), num_errors)
@@ -90,8 +108,13 @@ func TestErrorsHandle(t *testing.T) {
 
 func TestRemoveNonExistential(t *testing.T) {
 	pool := New(10, func(s string) error { return nil })
-	pool.AddWorker()
-	err := pool.RemoveWorker(999)
+	_, err := pool.AddWorker()
+	if err != nil {
+		pool.Stop()
+		t.Fatal(err)
+	}
+
+	err = pool.RemoveWorker(999)
 	if err == nil || err.Error() != "failed to remove worker: worker not found" {
 		t.Errorf("Expected 'worker not found' error, got: %v", err)
 	}
@@ -100,9 +123,14 @@ func TestRemoveNonExistential(t *testing.T) {
 
 func TestRemoveAfterStop(t *testing.T) {
 	pool := New(10, func(s string) error { return nil })
-	id, _ := pool.AddWorker()
+	id, err := pool.AddWorker()
+	if err != nil {
+		pool.Stop()
+		t.Fatal(err)
+	}
+
 	pool.Stop()
-	err := pool.RemoveWorker(id)
+	err = pool.RemoveWorker(id)
 	if err == nil || err.Error() != "failed to remove worker: worker pool is stopped" {
 		t.Errorf("Expected 'worker pool is stopped' error, got: %v", err)
 	}
@@ -137,7 +165,11 @@ func TestAddJobWithoutWorkers(t *testing.T) {
 	})
 
 	for range 3 {
-		pool.AddJob("test")
+		err := pool.AddJob("Job")
+		if err != nil {
+			pool.Stop()
+			t.Fatal(err)
+		}
 	}
 
 	pool.Stop()
@@ -152,10 +184,10 @@ func TestMultipleStop(t *testing.T) {
 }
 
 func TestRandomOperations(t *testing.T) {
-	var num_workers = 10
-	var num_runs = 100
-	var SEED = 42
-	var rnd = rand.New(rand.NewSource(int64(SEED)))
+	num_workers := 10
+	num_runs := 100
+	SEED := 42
+	rnd := rand.New(rand.NewSource(int64(SEED)))
 
 	available_ids := []int{}
 

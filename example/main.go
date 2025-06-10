@@ -15,11 +15,17 @@ func main() {
 	pool := workerpool.New(10, hello_func)
 
 	for range 3 {
-		pool.AddWorker()
+		_, err := pool.AddWorker()
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 
 	for i := range number_of_greetings {
-		pool.AddJob(fmt.Sprint(i))
+		err := pool.AddJob(fmt.Sprint(i))
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 
 	pool.StopWait()
